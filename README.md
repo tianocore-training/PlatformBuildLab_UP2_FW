@@ -31,7 +31,7 @@
 -->
 
 # PlatformBuildLab_UP2_FW
-Lab Material for Platform Build Lab - Currently MinnowBoard Max/ Turbot
+Lab Material for Platform Build Lab - Currently MinnowBoard V3 - UP Squared
 
 Copy the contents of the FW Directory to the other downloaded Training material
 
@@ -46,7 +46,7 @@ To see the Slides with links to the presentations goto https://gitpitch.com/tian
      - source for the Intel® Celeron(tm) processor N3350 Series and Intel Atom E3900 series
           (Formerly Apollo Lake)
 
-	 - 
+
 
 
 ####  From Lab_Material_FW
