@@ -46,6 +46,8 @@ RVV_BIOS_ENABLE=FALSE
 SrcDebug=FALSE
 UP2_BOARD=FALSE
 MINNOW3_MODULE_BOARD=FALSE
+isUP2=UP2_BOARD=FALSE
+
 
 ## Clean up previous build files.
 if [ -e $(pwd)/EDK2.log ]; then
@@ -138,6 +140,11 @@ for (( i=1; i<=$#; ))
     elif [ "$(echo $1 | tr 'a-z' 'A-Z')" == "/L" ]; then
       SpiAccessControl=1
       shift
+    elif [ "$(echo $1 | tr 'a-z' 'A-Z')" == "/J" ]; then
+         Build_Flags=$Build_Flags" -j EDK2.log "
+          JLog="--log=EDK2.log"
+          echo " /J for " $JLog
+     shift
     else
       break
     fi
@@ -174,6 +181,8 @@ elif [ $BoardId == "UP" ]; then
   BOARD_ID=UPBO
   echo BOARD_ID = UP2BORD >> $WORKSPACE/Conf/BiosId.env
   UP2_BOARD=TRUE
+  isUP2=UP2_BOARD=TRUE
+
 else
   break
 fi
@@ -212,10 +221,14 @@ fi
 if [ "$(echo $2 | tr 'a-z' 'A-Z')" == "RELEASE" ]; then
   TARGET=RELEASE
   BUILD_TYPE=R
+  LG=LOGGING=FALSE
+  echo DEFINE LOGGING = FALSE     >> $Build_Macros
   echo BUILD_TYPE = R >> $WORKSPACE/Conf/BiosId.env
 else
   TARGET=DEBUG
   BUILD_TYPE=D
+  echo DEFINE LOGGING = TRUE     >> $Build_Macros
+  LG=LOGGING=TRUE
   echo BUILD_TYPE = D >> $WORKSPACE/Conf/BiosId.env
 fi
 
@@ -313,7 +326,24 @@ echo "**** Due to nasm can't execute in Ubuntu ****"
 
 echo "Invoking EDK2 build..."
 
-build -t ${TOOL_CHAIN_TAG} $Build_Flags
+ ##**********************************************************************
+ ##  Invoke the EDK2 BUILD HERE
+ ##**********************************************************************
+ cat Conf/target.txt
+ cat $Build_Macros
+ echo  Check the above target.txt for correct platform
+ echo . . . 
+ echo Current directory is $(pwd)
+ echo . . . 
+ echo  
+ echo "Invoking EDK2 build..."
+ echo build -t ${TOOL_CHAIN_TAG} $JLog -D $LG -D $isUP2
+ echo "Press ENTER to continue OR Control-C to abort"
+ read
+ ## echo build  $JLog  -D $SDB -D $LG $QF  
+ echo build -t ${TOOL_CHAIN_TAG} $JLog -D $LG -D $isUP2
+
+build -t ${TOOL_CHAIN_TAG} $JLog -D $LG -D $isUP2
 
 echo "check if Build was successful"
 

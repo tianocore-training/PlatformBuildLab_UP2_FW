@@ -152,6 +152,12 @@ if /i "%~1"=="/L" (
     goto OptLoop
 )
 
+if /i "%~1"=="/j" (
+    set Build_Flags=%Build_Flags% /J
+    shift
+    goto OptLoop
+)
+
 :: Require 2 input parameters
 if "%~2"=="" (
    echo. & echo -- ERROR: Not Enough Arguments Provided
@@ -222,7 +228,7 @@ echo.
 echo Usage: %thisscript% [options] ^<PlatformType^> ^<BuildTarget^>
 echo.
 echo.    /?       Display this help text
-echo     /l       Log a copy of the build output to EDK2.log
+echo     /j       Log a copy of the build output to EDK2.log
 echo     /c       CleanAll before building
 echo     /m 	  Set the build thread count to number of processors
 echo     /FspW    Build FSP and FSP Wrapper

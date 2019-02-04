@@ -44,10 +44,14 @@ if not exist %WORKSPACE%\Conf md %WORKSPACE%\Conf
 :: Setup EDK environment. Edksetup puts new copies of target.txt, tools_def.txt, build_rule.txt in WorkSpace\Conf
 :: Also run edksetup as soon as possible to avoid it from changing environment variables we're overriding
 set "VCINSTALLDIR="
+
+:: error out if python 27 not installed
+if not exist C:\Python27   goto ExitFailNoPython
+
 set PYTHON_HOME=C:\Python27
 @call %CORE_PATH%\edksetup.bat --nt32
 @if defined PYTHON_HOME (
-  @nmake -f %BASE_TOOLS_PATH%\Makefile
+    @nmake -f %BASE_TOOLS_PATH%\Makefile
 )
 @echo off
 
@@ -74,7 +78,7 @@ set STITCH_PATH=%WORKSPACE%\%PLATFORM_PATH%\Common\Tools\Stitch
 set ResetVectorPath=%WORKSPACE%\%PLATFORM_RC_PACKAGE%\Cpu\ResetVector
 
 PATH=%PATH%;%WORKSPACE%\%PLATFORM_PATH%\Common\Tools\GenBiosId;%WORKSPACE%\%PLATFORM_PATH%\Common\Tools\nasm\Win32
-PATH=%PATH%;%WORKSPACE%\%PLATFORM_PATH%\Common\Tools\FCE;%WORKSPACE%\%PLATFORM_PATH%\Common\Tools\nasm\Win32
+PATH=%PATH%;%WORKSPACE%\%PLATFORM_PATH%\Common\Tools\FCE;%WORKSPACE%\%PLATFORM_PATH%\Common\Tools\nasm\Win32;%PYTHON_HOME%
 
 ::**********************************************************************
 :: Parse command line arguments
@@ -85,7 +89,7 @@ PATH=%PATH%;%WORKSPACE%\%PLATFORM_PATH%\Common\Tools\FCE;%WORKSPACE%\%PLATFORM_P
 if /i "%~1"=="" goto Usage
 if /i "%~1"=="/?" goto Usage
 
-if /i "%~1"=="/l" (
+if /i "%~1"=="/j" (
     set Build_Flags=%Build_Flags% -j EDK2.log
     shift
     goto OptLoop
@@ -268,8 +272,8 @@ if "%Arch%"=="IA32" (
     echo DEFINE X64_CONFIG              = TRUE                      >> %Build_Macros%
 )
 
-echo DEFINE UP2_BOARD                = %UP2_BOARD%               >> %Build_Macros%
-echo DEFINE MINNOW3_MODULE_BOARD     = %MINNOW3_MODULE_BOARD%    >> %Build_Macros%
+echo DEFINE UP2_BOARD               = %UP2_BOARD%               >> %Build_Macros%
+echo DEFINE MINNOW3_MODULE_BOARD    = %MINNOW3_MODULE_BOARD%    >> %Build_Macros%
 
 ::Stage of copy of BiosId.env in Conf/ with Platform_Type and Build_Target values removed
 
@@ -282,9 +286,13 @@ if "%Arch%"=="X64" (
 
 if /i "%~2" == "RELEASE" (
     set target=RELEASE
+    set Build_Flags=%Build_Flags% -D LOGGING=FALSE
+    echo DEFINE LOGGING                 = FALSE                      >> %Build_Macros%
     echo BUILD_TYPE = R >> Conf\BiosId.env
 ) else (
     set target=DEBUG
+    set Build_Flags=%Build_Flags% -D LOGGING=TRUE
+    echo DEFINE LOGGING                 = TRUE                      >> %Build_Macros%
     echo BUILD_TYPE = D >> Conf\BiosId.env
 )
 
@@ -325,6 +333,7 @@ if %BoardId%==LH (
 if %BoardId%==UP (
   if %FabId%==A (
     echo BOARD_REV = A >> Conf\BiosId.env
+    set Build_Flags=%Build_Flags% -D UP2_BOARD=TRUE
   )
 )
 
@@ -416,14 +425,29 @@ echo Building ResetVector...
 
 
 pushd %ResetVectorPath%\Vtf0
-  nasm.exe %Nasm_Flags% -o Bin\ResetVector.ia32.port80.raw ResetVectorCode.asm
+  %NASM_PREFIX%nasm.exe %Nasm_Flags% -o Bin\ResetVector.ia32.port80.raw ResetVectorCode.asm
   python %CORE_PATH%\UefiCpuPkg\ResetVector\Vtf0\Tools\FixupForRawSection.py Bin\ResetVector.ia32.port80.raw
 popd
 
+
+if NOT ErrorLevel 1 goto WePassed1
+echo python fixup failed, Building ResetVector FAILED
+goto ExitFailNoPython
+
+:WePassed1
+
 pushd %ResetVectorPath%\Vtf1
-  nasm.exe %Nasm_Flags% -o Bin\ResetVector.ia32.port80.raw ResetVectorCode.asm
+  %NASM_PREFIX%nasm.exe %Nasm_Flags% -o Bin\ResetVector.ia32.port80.raw ResetVectorCode.asm
   python %CORE_PATH%\UefiCpuPkg\ResetVector\Vtf0\Tools\FixupForRawSection.py Bin\ResetVector.ia32.port80.raw
 popd
+
+if NOT ErrorLevel 1 goto WePassed2
+echo python fixup failed, Building ResetVector FAILED
+goto ExitFailNoPython
+
+:WePassed2
+echo continue with build after Building ResetVector
+
 
 :: SaveWorkSpace w/a is needed when using subst for Workspace builds (eg. R:/)
 set SaveWorkSpace=%WORKSPACE%
@@ -456,7 +480,15 @@ echo *_VS2013x86_*_ASL_PATH = %AslPath% >> Conf\tools_def.txt
 echo *_VS2015x86_*_ASL_PATH = %AslPath% >> Conf\tools_def.txt
 
 echo.
-echo Invoking normal EDK2 build...
+echo ******  About to call EDK II build ******
+echo.
+
+type %Build_Macros%
+echo Check above Build Macros for correctness 
+echo PLATFORM_NAME is %PLATFORM_NAME%
+echo Invoking normal EDK2 build... with the following: 
+echo call build %Build_Flags%
+pause
 call build %Build_Flags%
 if ErrorLevel 1 goto BldFail
 
@@ -642,7 +674,7 @@ echo.
 echo Usage: %0 [options] ^<PlatformType^> ^<BuildTarget^>
 echo.
 echo.   /?       Display this help text
-echo    /l       Log a copy of the build output to EDK2.log
+echo    /j       Log a copy of the build output to EDK2.log
 echo    /x64     Set Arch to X64  (default)
 echo    /ia32    Set Arch to IA32
 echo    /vs08    Set compiler to VisualStudio 2008
@@ -659,9 +691,15 @@ echo.
 set exitCode=1
 goto Exit
 
+:ExitFailNoPython
+set exitCode=1
+echo  -- Error:  EDK II BIOS Build has failed!  
+echo Python27 NOT Found, please install Python27 to C:\Python27
+goto Exit
+
 :BldFail
 set exitCode=1
-echo  -- Error:  EDKII BIOS Build has failed!
+echo  -- Error:  EDK II BIOS Build has failed!
 echo See EDK2.log for more details
 
 :Exit

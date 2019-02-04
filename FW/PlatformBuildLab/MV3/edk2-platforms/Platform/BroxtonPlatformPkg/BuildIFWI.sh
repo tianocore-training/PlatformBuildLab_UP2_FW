@@ -28,6 +28,7 @@ function Usage () {
   echo "       Build_Flags:                 /B     Set FabId to B (default)"
   echo "       Build_Flags:                 /C     Set FabId to C"
   echo "       Build_Flags:                 /D     Set FabId to D"
+  echo "       Build_Flags:                 /J     Create EDK II Log file"
   echo "       Build_Flags:                 /L     Flash region access permission for host CPU"
   echo "       Platform_Type [optional]:    Broxton "                   
   echo "       Build_Target:                Release, Debug "
@@ -102,6 +103,9 @@ for (( i=1; i<=$#; ))
       shift
     elif [ "$(echo $1 | tr 'a-z' 'A-Z')" == "/L" ]; then
       Build_Flags="$Build_Flags /L"
+      shift
+    elif [ "$(echo $1 | tr 'a-z' 'A-Z')" == "/J" ]; then
+      Build_Flags="$Build_Flags /J"
       shift
     else
       break
